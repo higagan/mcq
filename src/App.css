@@ -29,6 +29,18 @@ button:hover {
   margin: 20px 0;
 }
 
+.captured-image-container img {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.button-container {
+  margin-top: 20px;
+}
+
 .loading-container {
   display: flex;
   flex-direction: column;
@@ -36,19 +48,48 @@ button:hover {
   margin-top: 20px;
 }
 
-.answer-container {
+.answer-container, .error-container {
   margin-top: 20px;
   text-align: left;
   max-width: 90%;
   margin-left: auto;
   margin-right: auto;
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
 }
 
-pre {
-  text-align: left;
-  display: inline-block;
-  max-width: 90%;
-  background-color: #f4f4f4;
-  padding: 10px;
-  border-radius: 5px;
+.answer-container h2, .error-container h2 {
+  color: #333;
+}
+
+.answer-container p {
+  font-size: 18px;
+  color: #006600; /* Green color for answers */
+}
+
+.error-container p {
+  font-size: 18px;
+  color: #cc0000; /* Red color for errors */
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+  .App {
+    padding: 10px;
+  }
+
+  button {
+    width: 100%;
+    padding: 15px 0;
+  }
+
+  .captured-image-container img {
+    width: 100%;
+    height: auto;
+  }
+
+  .answer-container, .error-container {
+    padding: 10px;
+  }
 }

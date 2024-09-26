@@ -1,73 +1,80 @@
 // src/App.js
 
 import React, { useRef, useState } from 'react';
-import Webcam from 'react-webcam';
 import Tesseract from 'tesseract.js';
 import axios from 'axios';
 import { ClipLoader } from 'react-spinners';
 import './App.css';
 
 function App() {
-  // Reference to the webcam component
-  const webcamRef = useRef(null);
-
-  // State variables
+  const fileInputRef = useRef(null);
   const [imageSrc, setImageSrc] = useState(null);      // Captured image source
   const [answer, setAnswer] = useState('');            // AI-generated answer
   const [loading, setLoading] = useState(false);       // Loading state
   const [error, setError] = useState('');              // Error messages
 
-  // Function to capture the image and initiate processing
-  const captureAndProcess = async () => {
-    // Reset previous states
-    setAnswer('');
-    setError('');
-
-    // Capture the image from the webcam
-    const image = webcamRef.current.getScreenshot();
-    if (!image) {
-      setError('Failed to capture image. Please try again.');
-      return;
+  // Function to handle the button click and trigger file input
+  const handleButtonClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
     }
-    setImageSrc(image);
-    setLoading(true);
+  };
 
-    try {
-      // Perform OCR using Tesseract.js
-      const ocrResult = await Tesseract.recognize(image, 'eng', {
-        logger: (m) => console.log(m), // Optional: Log progress
-      });
+  // Function to handle the file input change (image captured)
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      setError('');
+      setAnswer('');
+      setImageSrc(URL.createObjectURL(file));
+      setLoading(true);
 
-      const extractedText = ocrResult.data.text.trim();
-      console.log('Extracted Text:', extractedText);
+      try {
+        // Convert image file to base64
+        const base64Image = await convertToBase64(file);
 
-      if (!extractedText) {
-        setError('No text detected. Please try again with a clearer image.');
+        // Perform OCR using Tesseract.js
+        const ocrResult = await Tesseract.recognize(base64Image, 'eng', {
+          logger: (m) => console.log(m), // Optional: Log progress
+        });
+
+        const extractedText = ocrResult.data.text.trim();
+        console.log('Extracted Text:', extractedText);
+
+        if (!extractedText) {
+          setError('No text detected. Please try again with a clearer image.');
+          setLoading(false);
+          return;
+        }
+
+        // Prepare the request payload for the backend
+        const payload = {
+          question_text: extractedText
+        };
+
+        // Call the backend API to get the answer
+        const response = await axios.post('https://quizcracker-backend.vercel.app/api/get-answer', payload);
+
+        const aiAnswer = response.data.answer;
+        console.log('AI Answer:', aiAnswer);
+        setAnswer(aiAnswer);
+      } catch (err) {
+        console.error('Error during processing:', err.response?.data || err.message);
+        setError('An error occurred while processing. Please try again.');
+      } finally {
         setLoading(false);
-        return;
       }
-
-      // Prepare the prompt for the backend API
-      const prompt = `You are an intelligent assistant that helps answer multiple-choice questions. Below is the question and the options. Provide the correct answer (e.g., "A", "B", "C", or "D") along with a brief explanation.
-
-${extractedText}
-
-Answer:`;
-
-      // Send the prompt to the backend server
-      const response = await axios.post('https://quizcracker-backend.vercel.app/api/get-answer', {
-        prompt: prompt,
-      });
-
-      const aiAnswer = response.data.answer;
-      console.log('AI Answer:', aiAnswer);
-      setAnswer(aiAnswer);
-    } catch (err) {
-      console.error('Error during processing:', err.response?.data || err.message);
-      setError('An error occurred while processing. Please try again.');
-    } finally {
-      setLoading(false);
     }
+  };
+
+  // Utility function to convert image file to base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
   };
 
   // Function to retake the photo
@@ -75,34 +82,36 @@ Answer:`;
     setImageSrc(null);
     setAnswer('');
     setError('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null;
+    }
   };
 
   return (
     <div className="App">
       <h1>MCQ Quiz Helper</h1>
 
-      {/* Webcam or Captured Image Display */}
-      {!imageSrc ? (
-        <Webcam
-          audio={false}
-          ref={webcamRef}
-          screenshotFormat="image/jpeg"
-          width={320}
-          height={240}
-          videoConstraints={{
-            facingMode: 'environment', // Use the rear camera if available
-          }}
-        />
-      ) : (
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        accept="image/*"
+        capture="environment"
+        ref={fileInputRef}
+        style={{ display: 'none' }}
+        onChange={handleFileChange}
+      />
+
+      {/* Display Captured Image */}
+      {imageSrc && (
         <div className="captured-image-container">
-          <img src={imageSrc} alt="Captured" width={320} height={240} />
+          <img src={imageSrc} alt="Captured" />
         </div>
       )}
 
       {/* Action Buttons */}
       <div className="button-container">
         {!imageSrc ? (
-          <button onClick={captureAndProcess}>Capture & Get Answer</button>
+          <button onClick={handleButtonClick}>Take Photo & Get Answer</button>
         ) : (
           <button onClick={retakePhoto}>Retake Photo</button>
         )}
@@ -116,17 +125,7 @@ Answer:`;
         </div>
       )}
 
-      {/* Display Extracted Text (Optional) */}
-      {/* Uncomment the following block if you want to display the extracted text
-      {extractedText && (
-        <div className="extracted-text-container">
-          <h2>Extracted Text:</h2>
-          <pre>{extractedText}</pre>
-        </div>
-      )} 
-      */}
-
-      {/* Display Answer or Error */}
+      {/* Display Answer */}
       {answer && (
         <div className="answer-container">
           <h2>Answer:</h2>
@@ -134,6 +133,7 @@ Answer:`;
         </div>
       )}
 
+      {/* Display Error */}
       {error && (
         <div className="error-container">
           <h2>Error:</h2>
